@@ -99,11 +99,11 @@ function calculateAdminMemberStats(member) {
         'star': '守護星',
         'pattern': '紋樣',
         'item': '道具收集',
-        'artifact': '神器',
-        'doll': '洋娃娃',
+        'artifact': '聖物',
+        'doll': '魔法娃娃',
         'transform': '變身卡',
         'prof': '煉金術',
-        'elixir': '煉金靈藥'
+        'elixir': '哈芙萬能藥'
     };
     
     const equipmentKeys = [
@@ -137,8 +137,8 @@ function calculateAdminMemberStats(member) {
         'eq_bracelet1': '手鐲1',
         'eq_bracelet2': '手鐲2',
         'eq_bracelet3': '手鐲3',
-        'eq_rune1': '符文1',
-        'eq_rune2': '符文2',
+        'eq_rune1': '符石1',
+        'eq_rune2': '符石2',
         'eq_guard_seal': '守護刻印',
         'eq_recover_seal': '恢復刻印',
         'eq_crystal': '結晶',
