@@ -262,6 +262,11 @@ function showPage(pageName) {
     if (pageName === 'stats-view') {
         loadStatsView();
     }
+    
+    // 如果切換到我的數據頁面，載入角色列表
+    if (pageName === 'my-stats') {
+        loadMemberList();
+    }
 }
 
 // 顯示模組
@@ -353,6 +358,26 @@ function initModules() {
                 this.value = 'melee'; // 暫時切回近戰
             }
         });
+    }
+    
+    // 角色選擇器 - 載入已有角色列表
+    const memberSelector = document.getElementById('memberSelector');
+    if (memberSelector) {
+        memberSelector.addEventListener('change', function() {
+            const selectedName = this.value;
+            if (selectedName) {
+                document.getElementById('memberName').value = selectedName;
+                loadUserDataByName(selectedName);
+            } else {
+                // 選擇新角色時清空表單
+                clearAllFields();
+                document.getElementById('memberName').value = '';
+                document.getElementById('memberClass').value = '';
+            }
+        });
+        
+        // 載入角色列表
+        loadMemberList();
     }
     
     // 角色名稱輸入框 - 自動載入已有數據
@@ -640,6 +665,8 @@ async function saveData() {
                 alert('儲存失敗：' + error.message);
             } else {
                 alert('數據儲存成功！');
+                // 重新載入角色列表
+                loadMemberList();
             }
         } catch (err) {
             console.error('儲存錯誤:', err);
@@ -727,7 +754,35 @@ function calculateTotalScore() {
     
     return score;
 }
-
+// 載入角色列表到選擇器
+async function loadMemberList() {
+    const selector = document.getElementById('memberSelector');
+    if (!selector || !supabaseClient) return;
+    
+    try {
+        const { data: members, error } = await supabaseClient
+            .from('combat_data')
+            .select('member_name, member_class')
+            .order('updated_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        // 清空現有選項（保留第一個預設選項）
+        selector.innerHTML = '<option value="">-- 新角色或手動輸入 --</option>';
+        
+        // 添加角色選項
+        if (members && members.length > 0) {
+            members.forEach(member => {
+                const option = document.createElement('option');
+                option.value = member.member_name;
+                option.textContent = `${member.member_name} (${member.member_class || '未設定職業'})`;
+                selector.appendChild(option);
+            });
+        }
+    } catch (err) {
+        console.error('載入角色列表錯誤:', err);
+    }
+}
 // 載入使用者數據（按名稱）- 從 Supabase
 async function loadUserDataByName(memberName) {
     if (!memberName) return;
