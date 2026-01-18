@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>本地測試 - 天堂M戰力系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="bg-white rounded-lg shadow-lg p-8">
+            <h1 class="text-3xl font-bold text-blue-600 mb-6">天堂M 近戰戰力系統 - 本地測試</h1>
+            
+            <div class="space-y-6">
+                <div class="border-l-4 border-green-500 pl-4 bg-green-50 p-4 rounded">
+                    <h2 class="text-xl font-bold text-green-700 mb-2">✅ 系統已建立完成！</h2>
+                    <p class="text-gray-700">所有檔案已成功創建並整合。</p>
+                </div>
+
+                <div class="bg-blue-50 p-6 rounded-lg">
+                    <h3 class="text-lg font-bold text-blue-800 mb-4">📋 已建立的檔案</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li class="flex items-center gap-2">
+                            <span class="text-green-600">✓</span>
+                            <code class="bg-gray-200 px-2 py-1 rounded">index.html</code> - 主頁面（9大模組輸入）
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="text-green-600">✓</span>
+                            <code class="bg-gray-200 px-2 py-1 rounded">admin.html</code> - 管理員看板
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="text-green-600">✓</span>
+                            <code class="bg-gray-200 px-2 py-1 rounded">app.js</code> - 主程式邏輯
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="text-green-600">✓</span>
+                            <code class="bg-gray-200 px-2 py-1 rounded">admin.js</code> - 管理員邏輯
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="text-green-600">✓</span>
+                            <code class="bg-gray-200 px-2 py-1 rounded">config.js</code> - Supabase 配置
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="bg-yellow-50 p-6 rounded-lg border border-yellow-300">
+                    <h3 class="text-lg font-bold text-yellow-800 mb-4">⚙️ 快速開始步驟</h3>
+                    <ol class="space-y-3 text-sm list-decimal list-inside">
+                        <li class="text-gray-700">
+                            <strong>設定 Supabase：</strong>
+                            <ul class="ml-6 mt-2 space-y-1 list-disc list-inside text-gray-600">
+                                <li>前往 <a href="https://supabase.com" target="_blank" class="text-blue-600 underline">Supabase.com</a> 建立專案</li>
+                                <li>執行 <code class="bg-gray-200 px-1">database_schema.sql</code></li>
+                                <li>在 <code class="bg-gray-200 px-1">config.js</code> 填入您的 URL 和 Key</li>
+                            </ul>
+                        </li>
+                        <li class="text-gray-700">
+                            <strong>本地測試：</strong>
+                            <ul class="ml-6 mt-2 space-y-1 list-disc list-inside text-gray-600">
+                                <li>直接開啟 <code class="bg-gray-200 px-1">index.html</code></li>
+                                <li>或使用 <code class="bg-gray-200 px-1">npm run dev</code> 啟動開發伺服器</li>
+                            </ul>
+                        </li>
+                        <li class="text-gray-700">
+                            <strong>部署至 Vercel：</strong>
+                            <ul class="ml-6 mt-2 space-y-1 list-disc list-inside text-gray-600">
+                                <li>執行 <code class="bg-gray-200 px-1">vercel</code> 命令</li>
+                                <li>設定環境變數後部署</li>
+                            </ul>
+                        </li>
+                    </ol>
+                </div>
+
+                <div class="bg-purple-50 p-6 rounded-lg">
+                    <h3 class="text-lg font-bold text-purple-800 mb-4">🎯 核心功能</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div class="bg-white p-4 rounded shadow">
+                            <h4 class="font-bold text-purple-700 mb-2">📝 數據輸入</h4>
+                            <ul class="space-y-1 text-gray-600 text-xs">
+                                <li>• 守護星 (25項指標)</li>
+                                <li>• 紋樣 (24項指標)</li>
+                                <li>• 道具收藏 (29項指標)</li>
+                                <li>• 聖物卡 (25項指標)</li>
+                                <li>• 魔法娃娃 (31項指標)</li>
+                                <li>• 變身卡 (31項指標)</li>
+                                <li>• 熟練度 (7項指標)</li>
+                                <li>• 哈芙萬能藥 (15項指標)</li>
+                                <li>• 技能狀態記錄</li>
+                            </ul>
+                        </div>
+                        <div class="bg-white p-4 rounded shadow">
+                            <h4 class="font-bold text-purple-700 mb-2">📊 管理員看板</h4>
+                            <ul class="space-y-1 text-gray-600 text-xs">
+                                <li>• 全盟數據統計</li>
+                                <li>• 動態標竿系統</li>
+                                <li>• 個人 vs 平均值比較</li>
+                                <li>• 三大排行榜</li>
+                                <li>• Chart.js 視覺化圖表</li>
+                                <li>• 低於平均 20% 紅色警示</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-4">
+                    <a href="index.html" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg text-center transition">
+                        開啟主頁面 →
+                    </a>
+                    <a href="admin.html" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-lg text-center transition">
+                        開啟管理員看板 →
+                    </a>
+                </div>
+
+                <div class="text-center text-sm text-gray-500 pt-4 border-t">
+                    <p>📖 詳細說明請參考 <code class="bg-gray-200 px-2 py-1 rounded">README.md</code> 和 <code class="bg-gray-200 px-2 py-1 rounded">DEPLOYMENT.md</code></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

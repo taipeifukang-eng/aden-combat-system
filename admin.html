@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理員看板 - 天堂M 近戰戰力分析</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
+    <style>
+        .stat-card {
+            @apply bg-white rounded-lg shadow-md p-6 transition hover:shadow-lg;
+        }
+        .rank-gold {
+            @apply bg-gradient-to-r from-yellow-400 to-yellow-600 text-white;
+        }
+        .rank-silver {
+            @apply bg-gradient-to-r from-gray-300 to-gray-500 text-white;
+        }
+        .rank-bronze {
+            @apply bg-gradient-to-r from-orange-400 to-orange-600 text-white;
+        }
+        .stat-low {
+            @apply text-red-600 font-bold;
+        }
+        .stat-normal {
+            @apply text-green-600;
+        }
+        .benchmark {
+            @apply bg-blue-100 border-l-4 border-blue-600 p-4 mb-4;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- 導覽列 -->
+    <nav class="bg-purple-700 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold">📊 管理員看板</h1>
+                <a href="index.html" class="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-md font-semibold">
+                    返回數據輸入
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要內容 -->
+    <div class="container mx-auto px-4 py-8">
+        <!-- 統計摘要 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="stat-card">
+                <div class="text-gray-600 text-sm mb-2">總成員數</div>
+                <div class="text-3xl font-bold text-blue-600" id="totalMembers">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="text-gray-600 text-sm mb-2">平均戰力</div>
+                <div class="text-3xl font-bold text-green-600" id="avgScore">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="text-gray-600 text-sm mb-2">最高戰力</div>
+                <div class="text-3xl font-bold text-purple-600" id="maxScore">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="text-gray-600 text-sm mb-2">最低戰力</div>
+                <div class="text-3xl font-bold text-orange-600" id="minScore">0</div>
+            </div>
+        </div>
+
+        <!-- 選擇成員 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">成員分析</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">選擇成員</label>
+                    <select id="memberSelect" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="">-- 請選擇成員 --</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button id="analyzeBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded-md transition">
+                        分析成員數據
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 動態標竿 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8" id="benchmarkSection" style="display:none;">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">🎯 動態標竿 (全盟最大值)</h2>
+            <div id="benchmarkContent" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- 動態生成 -->
+            </div>
+        </div>
+
+        <!-- 個人比較 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8" id="comparisonSection" style="display:none;">
+            <h2 class="text-xl font-bold mb-6 text-gray-800">📈 個人 vs 全盟平均值</h2>
+            <div id="comparisonContent">
+                <!-- 動態生成 -->
+            </div>
+        </div>
+
+        <!-- 排行榜 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- 總戰力排行 -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold mb-4 text-gray-800">🏆 總戰力排行</h3>
+                <div id="rankingTotal" class="space-y-2">
+                    <!-- 動態生成 -->
+                </div>
+            </div>
+
+            <!-- 近距離傷害排行 -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold mb-4 text-gray-800">⚔️ 近距離傷害排行</h3>
+                <div id="rankingDamage" class="space-y-2">
+                    <!-- 動態生成 -->
+                </div>
+            </div>
+
+            <!-- 近距離命中排行 -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold mb-4 text-gray-800">🎯 近距離命中排行</h3>
+                <div id="rankingHit" class="space-y-2">
+                    <!-- 動態生成 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 圖表區 -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold mb-6 text-gray-800">📊 戰力分佈圖表</h2>
+            <canvas id="scoreChart" height="100"></canvas>
+        </div>
+    </div>
+
+    <!-- 載入提示 -->
+    <div id="loadingOverlay" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 shadow-xl">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+            <p class="mt-4 text-gray-700 font-medium">載入中...</p>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>
