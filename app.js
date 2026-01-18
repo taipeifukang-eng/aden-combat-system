@@ -112,7 +112,7 @@ const MODULES = {
     eq_shoulder: ['物理防禦力', '近距離命中', '近距離傷害', '力量', '傷害減免', '昏迷命中', '昏迷抗性'],
     eq_weapon: ['近距離命中', '近距離傷害', '力量', '傷害增加', '無視近距離迴避力', '昏迷命中'],
     eq_cloak: ['物理防禦力', '近距離命中', '近距離傷害', '力量', 'PVP傷害減免', '最大HP', '無視PVP傷害減免', 'PVP傷害減少無視', '傷害減免'],
-    eq_armor: ['物理防禦力', '近距離命中', '近距離傷害', '無視近距離傷害減少'],
+    eq_armor: ['物理防禦力', '近距離命中', '近距離傷害', '無視近距離傷害減少', '傷害減免'],
     eq_armguard: ['物理防禦力', '近距離傷害', '力量', '傷害減免', '昏迷命中', '爆擊傷害減免'],
     eq_boots: ['物理防禦力', '力量', '傷害減免', 'PVP傷害減免', '最大HP'],
     eq_gloves: ['物理防禦力', '近距離命中', '近距離傷害', '力量', '昏迷命中', '傷害減免', 'PVP傷害減免'],
@@ -206,6 +206,8 @@ function initSupabase() {
     if (typeof SUPABASE_CONFIG !== 'undefined' && SUPABASE_CONFIG.url && SUPABASE_CONFIG.key && 
         SUPABASE_CONFIG.url !== 'YOUR_SUPABASE_URL') {
         supabaseClient = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.key);
+        // 暴露到全域供 admin.js 使用
+        window.supabaseClient = supabaseClient;
         console.log('✓ Supabase 已初始化');
     } else {
         console.log('ℹ Supabase 未配置，使用離線模式');
@@ -428,8 +430,8 @@ function initEquipmentModule() {
     });
 }
 
-// 根據裝備名稱預填數值
-window.prefillEquipmentValues = function(eqKey) {
+// 根據裝備名稱預填數值 - 從 Supabase 搜尋
+window.prefillEquipmentValues = async function(eqKey) {
     const nameInput = document.getElementById(`${eqKey}_name`);
     const hintEl = document.getElementById(`${eqKey}_hint`);
     if (!nameInput) return;
@@ -440,64 +442,89 @@ window.prefillEquipmentValues = function(eqKey) {
         return;
     }
     
-    // 搜尋所有角色中是否有相同裝備名稱
-    let foundData = null;
-    let foundFrom = null;
-    
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('combat_data_')) {
-            try {
-                const data = JSON.parse(localStorage.getItem(key));
-                // 檢查該角色是否有此裝備
-                if (data.equipment && data.equipment[eqKey]) {
-                    const eqData = data.equipment[eqKey];
-                    if (eqData['裝備名稱'] === equipmentName) {
-                        foundData = eqData;
-                        foundFrom = data.member_name;
-                        break;
-                    }
-                }
-            } catch (e) {
-                console.error('解析數據錯誤:', e);
-            }
+    if (!supabaseClient) {
+        if (hintEl) {
+            hintEl.innerHTML = `<span class="text-gray-500">離線模式，無法搜尋</span>`;
+            hintEl.style.display = 'block';
         }
+        return;
     }
     
-    if (foundData && foundFrom) {
-        // 預填數值
-        const fields = MODULES[eqKey];
-        fields.forEach((field, fieldIndex) => {
-            const inputId = `${eqKey}_${fieldIndex}`;
-            const input = document.getElementById(inputId);
-            if (input && foundData[field] !== undefined) {
-                input.value = foundData[field];
-                // 加上視覺提示（淺綠色背景）
-                input.classList.add('bg-green-50');
-            }
-        });
+    // 顯示搜尋中
+    if (hintEl) {
+        hintEl.innerHTML = `<span class="text-blue-500">搜尋中...</span>`;
+        hintEl.style.display = 'block';
+    }
+    
+    try {
+        // 從 Supabase 搜尋所有角色的裝備數據
+        const { data: allData, error } = await supabaseClient
+            .from('combat_data')
+            .select('member_name, equipment');
         
-        // 顯示提示訊息
-        if (hintEl) {
-            hintEl.innerHTML = `<span class="text-green-600">✓ 已從「${foundFrom}」預填數值，請確認後存檔</span>`;
-            hintEl.style.display = 'block';
-        }
-    } else {
-        // 沒找到，清除提示
-        if (hintEl) {
-            hintEl.innerHTML = `<span class="text-gray-500">此裝備尚無其他角色登記過</span>`;
-            hintEl.style.display = 'block';
+        if (error) {
+            console.error('搜尋裝備錯誤:', error);
+            if (hintEl) {
+                hintEl.innerHTML = `<span class="text-red-500">搜尋失敗</span>`;
+            }
+            return;
         }
         
-        // 清除視覺提示
-        const fields = MODULES[eqKey];
-        fields.forEach((field, fieldIndex) => {
-            const inputId = `${eqKey}_${fieldIndex}`;
-            const input = document.getElementById(inputId);
-            if (input) {
-                input.classList.remove('bg-green-50');
+        // 搜尋相同裝備名稱
+        let foundData = null;
+        let foundFrom = null;
+        
+        for (const record of (allData || [])) {
+            if (record.equipment && record.equipment[eqKey]) {
+                const eqData = record.equipment[eqKey];
+                if (eqData['裝備名稱'] === equipmentName) {
+                    foundData = eqData;
+                    foundFrom = record.member_name;
+                    break;
+                }
             }
-        });
+        }
+        
+        if (foundData && foundFrom) {
+            // 預填數值
+            const fields = MODULES[eqKey];
+            fields.forEach((field, fieldIndex) => {
+                const inputId = `${eqKey}_${fieldIndex}`;
+                const input = document.getElementById(inputId);
+                if (input && foundData[field] !== undefined) {
+                    input.value = foundData[field];
+                    // 加上視覺提示（淺綠色背景）
+                    input.classList.add('bg-green-50');
+                }
+            });
+            
+            // 顯示提示訊息
+            if (hintEl) {
+                hintEl.innerHTML = `<span class="text-green-600">✓ 已從「${foundFrom}」預填數值，請確認後存檔</span>`;
+                hintEl.style.display = 'block';
+            }
+        } else {
+            // 沒找到，清除提示
+            if (hintEl) {
+                hintEl.innerHTML = `<span class="text-gray-500">此裝備尚無其他角色登記過</span>`;
+                hintEl.style.display = 'block';
+            }
+            
+            // 清除視覺提示
+            const fields = MODULES[eqKey];
+            fields.forEach((field, fieldIndex) => {
+                const inputId = `${eqKey}_${fieldIndex}`;
+                const input = document.getElementById(inputId);
+                if (input) {
+                    input.classList.remove('bg-green-50');
+                }
+            });
+        }
+    } catch (err) {
+        console.error('搜尋裝備錯誤:', err);
+        if (hintEl) {
+            hintEl.innerHTML = `<span class="text-red-500">搜尋失敗</span>`;
+        }
     }
 }
 
@@ -554,28 +581,72 @@ async function saveData() {
     
     console.log('儲存數據:', data);
     
-    // 儲存到 localStorage
-    localStorage.setItem(`combat_data_${memberName}`, JSON.stringify(data));
+    // 計算戰力分數
+    const combatPower = {
+        total: calculateCombatPower(data, 'total'),
+        survival: calculateCombatPower(data, 'survival'),
+        burst: calculateCombatPower(data, 'burst'),
+        penetration: calculateCombatPower(data, 'penetration'),
+        pvp: calculateCombatPower(data, 'pvp')
+    };
+    
+    // 準備 Supabase 數據
+    const supabaseData = {
+        member_name: memberName,
+        member_class: memberClass,
+        character_type: characterType,
+        star: data.star,
+        pattern: data.pattern,
+        item: data.item,
+        artifact: data.artifact,
+        doll: data.doll,
+        transform: data.transform,
+        prof: data.prof,
+        elixir: data.elixir,
+        skill: data.skill,
+        equipment: data.equipment,
+        combat_power: combatPower,
+        updated_at: new Date().toISOString()
+    };
     
     // 儲存到 Supabase
     if (supabaseClient) {
         try {
-            const { error } = await supabaseClient
-                .from('alliance_combat_stats')
-                .upsert(data, { onConflict: 'member_name' });
+            // 先檢查是否存在
+            const { data: existing } = await supabaseClient
+                .from('combat_data')
+                .select('id')
+                .eq('member_name', memberName)
+                .single();
+            
+            let error;
+            if (existing) {
+                // 更新
+                const result = await supabaseClient
+                    .from('combat_data')
+                    .update(supabaseData)
+                    .eq('member_name', memberName);
+                error = result.error;
+            } else {
+                // 新增
+                const result = await supabaseClient
+                    .from('combat_data')
+                    .insert(supabaseData);
+                error = result.error;
+            }
             
             if (error) {
                 console.error('Supabase 錯誤:', error);
-                alert('數據已儲存到本地，但同步失敗：' + error.message);
+                alert('儲存失敗：' + error.message);
             } else {
                 alert('數據儲存成功！');
             }
         } catch (err) {
             console.error('儲存錯誤:', err);
-            alert('數據已儲存到本地');
+            alert('儲存失敗: ' + err.message);
         }
     } else {
-        alert('數據已儲存到本地（離線模式）');
+        alert('無法連接資料庫');
     }
 }
 
@@ -657,34 +728,51 @@ function calculateTotalScore() {
     return score;
 }
 
-// 載入使用者數據（按名稱）
-function loadUserDataByName(memberName) {
+// 載入使用者數據（按名稱）- 從 Supabase
+async function loadUserDataByName(memberName) {
     if (!memberName) return;
     
-    // 從 localStorage 載入
-    const savedData = localStorage.getItem(`combat_data_${memberName}`);
-    if (savedData) {
-        const data = JSON.parse(savedData);
-        populateFields(data);
+    if (!supabaseClient) {
+        showNotification('無法連接資料庫', 'error');
+        return;
+    }
+    
+    try {
+        const { data: savedData, error } = await supabaseClient
+            .from('combat_data')
+            .select('*')
+            .eq('member_name', memberName)
+            .single();
         
-        // 顯示提示訊息
-        const memberNameInput = document.getElementById('memberName');
-        if (memberNameInput) {
-            const originalBg = memberNameInput.style.backgroundColor;
-            memberNameInput.style.backgroundColor = '#d1fae5';
-            setTimeout(() => {
-                memberNameInput.style.backgroundColor = originalBg;
-            }, 1000);
+        if (error && error.code !== 'PGRST116') {
+            console.error('載入錯誤:', error);
         }
         
-        // 顯示通知
-        showNotification(`已載入 ${memberName} 的數據`, 'success');
-        console.log('✓ 已載入本地數據:', memberName);
-    } else {
-        // 新角色
-        clearAllFields();
-        showNotification(`${memberName} 是新角色，請填寫數據`, 'info');
-        console.log('ℹ 新角色:', memberName);
+        if (savedData) {
+            populateFields(savedData);
+            
+            // 顯示提示訊息
+            const memberNameInput = document.getElementById('memberName');
+            if (memberNameInput) {
+                const originalBg = memberNameInput.style.backgroundColor;
+                memberNameInput.style.backgroundColor = '#d1fae5';
+                setTimeout(() => {
+                    memberNameInput.style.backgroundColor = originalBg;
+                }, 1000);
+            }
+            
+            // 顯示通知
+            showNotification(`已載入 ${memberName} 的數據`, 'success');
+            console.log('✓ 已從 Supabase 載入數據:', memberName);
+        } else {
+            // 新角色
+            clearAllFields();
+            showNotification(`${memberName} 是新角色，請填寫數據`, 'info');
+            console.log('ℹ 新角色:', memberName);
+        }
+    } catch (err) {
+        console.error('載入錯誤:', err);
+        showNotification('載入數據失敗', 'error');
     }
 }
 
@@ -954,14 +1042,14 @@ function initAuth() {
                 return;
             }
             
-            // 建立新用戶
+            // 建立新用戶（預設 viewer，等待管理員審核）
             const { data, error } = await supabaseClient
                 .from('users')
                 .insert({
                     email: email,
                     password_hash: await hashPassword(password),
                     game_character_id: gameId,
-                    role: 'member'
+                    role: 'viewer'
                 })
                 .select()
                 .single();
@@ -972,7 +1060,7 @@ function initAuth() {
                 return;
             }
             
-            showAuthSuccess('register', '註冊成功！請使用新帳號登入');
+            showAuthSuccess('register', '註冊成功！請等待管理員審核後即可登入使用');
             document.getElementById('registerForm').reset();
             
             // 自動切換到登入頁
@@ -1086,17 +1174,42 @@ function showToast(message, type = 'info') {
 
 // 登入後更新 UI
 function updateUIAfterLogin() {
+    const roleText = currentUser.role === 'admin' ? '管理員' : 
+                     currentUser.role === 'member' ? '成員' : '待審核';
+    const roleColor = currentUser.role === 'admin' ? 'text-purple-600' : 
+                      currentUser.role === 'member' ? 'text-green-600' : 'text-gray-500';
+    
     document.getElementById('userInfo').innerHTML = `
         <span class="text-gray-800 font-semibold">${currentUser.username}</span>
-        <span class="text-xs text-purple-600 ml-1">${currentUser.role === 'admin' ? '管理員' : '成員'}</span>
+        <span class="text-xs ${roleColor} ml-1">${roleText}</span>
     `;
     document.getElementById('loginBtn').style.display = 'none';
     document.getElementById('logoutBtn').style.display = 'block';
     
-    // 顯示管理員功能
+    // 根據角色控制導航
+    const myDataBtn = document.getElementById('myDataNavBtn');
+    const statsViewBtn = document.getElementById('statsViewNavBtn');
+    const adminBtn = document.getElementById('adminNavBtn');
+    const usersBtn = document.getElementById('usersNavBtn');
+    
     if (currentUser.role === 'admin') {
-        document.getElementById('adminNavBtn').style.display = 'flex';
-        document.getElementById('usersNavBtn').style.display = 'flex';
+        // 管理員：所有功能
+        if (myDataBtn) myDataBtn.style.display = 'flex';
+        if (statsViewBtn) statsViewBtn.style.display = 'flex';
+        if (adminBtn) adminBtn.style.display = 'flex';
+        if (usersBtn) usersBtn.style.display = 'flex';
+    } else if (currentUser.role === 'member') {
+        // 成員：我的數據、看板、成員分析
+        if (myDataBtn) myDataBtn.style.display = 'flex';
+        if (statsViewBtn) statsViewBtn.style.display = 'flex';
+        if (adminBtn) adminBtn.style.display = 'flex';
+        if (usersBtn) usersBtn.style.display = 'none';
+    } else {
+        // viewer（待審核）：只能看首頁
+        if (myDataBtn) myDataBtn.style.display = 'none';
+        if (statsViewBtn) statsViewBtn.style.display = 'none';
+        if (adminBtn) adminBtn.style.display = 'none';
+        if (usersBtn) usersBtn.style.display = 'none';
     }
 }
 
@@ -1105,35 +1218,50 @@ function updateUIAfterLogout() {
     document.getElementById('userInfo').innerHTML = '<span class="text-gray-600">訪客</span>';
     document.getElementById('loginBtn').style.display = 'block';
     document.getElementById('logoutBtn').style.display = 'none';
-    document.getElementById('adminNavBtn').style.display = 'none';
-    document.getElementById('usersNavBtn').style.display = 'none';
+    
+    // 隱藏所有受保護的 tab
+    const myDataBtn = document.getElementById('myDataNavBtn');
+    const statsViewBtn = document.getElementById('statsViewNavBtn');
+    const adminBtn = document.getElementById('adminNavBtn');
+    const usersBtn = document.getElementById('usersNavBtn');
+    
+    if (myDataBtn) myDataBtn.style.display = 'none';
+    if (statsViewBtn) statsViewBtn.style.display = 'none';
+    if (adminBtn) adminBtn.style.display = 'none';
+    if (usersBtn) usersBtn.style.display = 'none';
     
     showPage('home');
 }
 
-// 載入看板數據
-function loadStatsView() {
-    // 從 localStorage 載入所有數據
-    const allData = [];
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('combat_data_')) {
-            try {
-                const data = JSON.parse(localStorage.getItem(key));
-                allData.push(data);
-            } catch (e) {
-                console.error('解析數據錯誤:', e);
-            }
-        }
+// 載入看板數據 - 從 Supabase
+async function loadStatsView() {
+    if (!supabaseClient) {
+        console.error('Supabase 未初始化');
+        return;
     }
     
-    // 按角色類型分類
-    const meleeData = allData.filter(d => !d.character_type || d.character_type === 'melee');
-    const mageData = allData.filter(d => d.character_type === 'mage');
-    const rangedData = allData.filter(d => d.character_type === 'ranged');
-    
-    // 載入近戰排行榜
-    loadMeleeRanking(meleeData);
+    try {
+        const { data: allData, error } = await supabaseClient
+            .from('combat_data')
+            .select('*');
+        
+        if (error) {
+            console.error('載入看板數據錯誤:', error);
+            return;
+        }
+        
+        console.log('看板數據:', allData);
+        
+        // 按角色類型分類
+        const meleeData = (allData || []).filter(d => !d.character_type || d.character_type === 'melee');
+        const mageData = (allData || []).filter(d => d.character_type === 'mage');
+        const rangedData = (allData || []).filter(d => d.character_type === 'ranged');
+        
+        // 載入近戰排行榜
+        loadMeleeRanking(meleeData);
+    } catch (err) {
+        console.error('載入看板錯誤:', err);
+    }
 }
 
 // 切換看板 Tab
