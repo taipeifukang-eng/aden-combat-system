@@ -102,7 +102,7 @@ function calculateAdminMemberStats(member) {
         'artifact': '聖物',
         'doll': '魔法娃娃',
         'transform': '變身卡',
-        'prof': '煉金術',
+        'prof': '熟練度',
         'elixir': '哈芙萬能藥'
     };
     
