@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>數據導入工具</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 400px;
+            margin: 20px 0;
+            padding: 10px;
+            font-family: monospace;
+        }
+        button {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #4f46e5;
+        }
+        #log {
+            background: #f3f4f6;
+            padding: 20px;
+            border-radius: 6px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+    </style>
+</head>
+<body>
+    <h1>📦 數據導入工具</h1>
+    
+    <!-- 登入區 -->
+    <div id="loginSection">
+        <h3>請先登入</h3>
+        <input type="email" id="email" placeholder="Email" style="padding: 8px; margin-right: 10px;">
+        <input type="password" id="password" placeholder="密碼" style="padding: 8px; margin-right: 10px;">
+        <button onclick="login()" style="padding: 8px 16px;">登入</button>
+        <div id="loginStatus" style="margin-top: 10px; color: #ef4444;"></div>
+    </div>
+    
+    <!-- 導入區 -->
+    <div id="importSection" style="display: none;">
+        <p>請將本地導出的 JSON 數據貼到下方，然後點擊「開始導入」</p>
+        <textarea id="jsonData" placeholder='[
+  {
+    "member_name": "名器",
+    "member_class": "騎士",
+    ...
+  }
+]'></textarea>
+    
+        <button onclick="startImport()">開始導入</button>
+        
+        <div id="log"></div>
+    </div>
+
+    <script>
+        // 配置
+        const SUPABASE_CONFIG = {
+            url: 'https://rndewddjxadyrjsygapu.supabase.co',
+            key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuZGV3ZGRqeGFkeXJqc3lnYXB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3MDQwMjIsImV4cCI6MjA4NDI4MDAyMn0.OUnd1NX-4Su7rjSZzWiJAR3wrMo15bSVUEBjG98_v0M'
+        };
+        
+        const supabaseClient = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.key);
+        
+        // 登入函數
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const statusDiv = document.getElementById('loginStatus');
+            
+            if (!email || !password) {
+                statusDiv.textContent = '請輸入 Email 和密碼';
+                return;
+            }
+            
+            try {
+                // SHA-256 雜湊密碼
+                const msgBuffer = new TextEncoder().encode(password);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                const passwordHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                
+                // 查詢用戶
+                const { data, error } = await supabaseClient
+                    .from('users')
+                    .select('*')
+                    .eq('email', email)
+                    .eq('password_hash', passwordHash)
+                    .single();
+                
+                if (error || !data) {
+                    statusDiv.textContent = '❌ 登入失敗：帳號或密碼錯誤';
+                    return;
+                }
+                
+                if (!data.is_active) {
+                    statusDiv.textContent = '❌ 帳號已被停用';
+                    return;
+                }
+                
+                // 儲存登入資訊
+                localStorage.setItem('userId', data.id);
+                localStorage.setItem('userEmail', data.email);
+                localStorage.setItem('userRole', data.role);
+                
+                // 顯示導入區
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('importSection').style.display = 'block';
+                
+            } catch (err) {
+                statusDiv.textContent = '❌ 登入錯誤：' + err.message;
+            }
+        }
+        
+        // 檢查是否已登入
+        window.onload = function() {
+            if (localStorage.getItem('userId')) {
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('importSection').style.display = 'block';
+            }
+        };
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : '';
+            logDiv.innerHTML += `<div class="${className}">${message}</div>`;
+        }
+
+        async function startImport() {
+            const jsonText = document.getElementById('jsonData').value;
+            document.getElementById('log').innerHTML = '';
+            
+            try {
+                const localData = JSON.parse(jsonText);
+                log(`準備導入 ${localData.length} 筆數據...`);
+                
+                // 獲取當前登入用戶
+                const userId = localStorage.getItem('userId');
+                if (!userId) {
+                    log('❌ 請先登入系統！', 'error');
+                    return;
+                }
+                
+                let successCount = 0;
+                let errorCount = 0;
+                
+                for (const member of localData) {
+                    try {
+                        // 計算戰力分數
+                        const combatPower = calculateCombatPower(member);
+                        
+                        // 插入或更新數據
+                        const { error } = await supabaseClient
+                            .from('combat_data')
+                            .upsert({
+                                user_id: userId,
+                                member_name: member.member_name,
+                                member_class: member.member_class || '未設定',
+                                character_type: member.character_type || 'melee',
+                                star: member.star,
+                                pattern: member.pattern,
+                                item: member.item,
+                                artifact: member.artifact,
+                                doll: member.doll,
+                                transform: member.transform,
+                                prof: member.prof,
+                                elixir: member.elixir,
+                                skill: member.skill,
+                                equipment: member.equipment,
+                                combat_power: combatPower,
+                                updated_at: new Date().toISOString()
+                            }, {
+                                onConflict: 'user_id,member_name'
+                            });
+                        
+                        if (error) throw error;
+                        
+                        log(`✅ ${member.member_name} (職業: ${member.member_class}) - 總戰力: ${combatPower.total}`, 'success');
+                        successCount++;
+                        
+                    } catch (err) {
+                        log(`❌ ${member.member_name} 導入失敗: ${err.message}`, 'error');
+                        errorCount++;
+                    }
+                    
+                    // 避免請求過快
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+                
+                log(`\n=== 導入完成 ===`);
+                log(`✅ 成功: ${successCount} 筆`, 'success');
+                if (errorCount > 0) {
+                    log(`❌ 失敗: ${errorCount} 筆`, 'error');
+                }
+                log(`\n請前往「成員分析」頁面查看數據`);
+                
+            } catch (err) {
+                log(`❌ JSON 解析錯誤: ${err.message}`, 'error');
+            }
+        }
+        
+        // 戰力計算函數（簡化版）
+        function calculateCombatPower(data) {
+            // 生存力
+            const survival = Math.round(
+                (data.star?.最大HP || 0) * 0.2 +
+                (data.star?.物理防禦力 || 0) * 1.5 +
+                (data.star?.傷害減免 || 0) * 3.0
+            );
+            
+            // 爆發力
+            const burst = Math.round(
+                (data.star?.力量 || 0) * 2.0 +
+                (data.star?.近距離傷害 || 0) * 5.0 +
+                (data.star?.攻擊速度 || 0) * 10.0
+            );
+            
+            // 穿透力
+            const penetration = Math.round(
+                (data.star?.近距離命中 || 0) * 3.0 +
+                (data.star?.無視傷害減免 || 0) * 6.0
+            );
+            
+            // PVP
+            const pvp = Math.round(
+                (data.star?.PVP傷害減免 || 0) * 3.0
+            );
+            
+            const total = survival + burst + penetration + pvp;
+            
+            return { survival, burst, penetration, pvp, total };
+        }
+    </script>
+</body>
+</html>

@@ -1,5 +1,10 @@
 // 管理員看板 - JavaScript
-// 此文件依賴 app.js 中的全域 supabase 實例
+
+// 直接創建 Supabase 實例
+const adminSupabase = window.supabase.createClient(
+    'https://rndewddjxadyrjsygapu.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuZGV3ZGRqeGFkeXJqc3lnYXB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3MDQwMjIsImV4cCI6MjA4NDI4MDAyMn0.OUnd1NX-4Su7rjSZzWiJAR3wrMo15bSVUEBjG98_v0M'
+);
 
 let selectedMembers = [];
 
@@ -171,21 +176,29 @@ async function loadAdminData() {
     
     adminContent.innerHTML = '<p class="text-gray-500">載入中...</p>';
     
-    // 從 localStorage 載入所有數據
-    const allData = [];
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('combat_data_')) {
-            try {
-                const data = JSON.parse(localStorage.getItem(key));
-                // 計算戰力分數
-                data.combatPower = calculateAdminCombatPower(data);
-                allData.push(data);
-            } catch (e) {
-                console.error('解析數據錯誤:', e);
-            }
-        }
+    // 從 Supabase 載入所有數據
+    const { data: combatData, error } = await adminSupabase
+        .from('combat_data')
+        .select('*')
+        .eq('character_type', 'melee')
+        .order('updated_at', { ascending: false });
+    
+    if (error) {
+        console.error('載入數據錯誤:', error);
+        adminContent.innerHTML = `
+            <div class="text-center text-red-500 py-8">
+                <p>載入失敗：${error.message}</p>
+            </div>
+        `;
+        return;
     }
+    
+    const allData = combatData || [];
+    
+    // 使用正確的權重公式重新計算戰力
+    allData.forEach(data => {
+        data.combatPower = calculateAdminCombatPower(data);
+    });
     
     // 按總戰力排序
     allData.sort((a, b) => (b.combatPower?.total || 0) - (a.combatPower?.total || 0));
@@ -714,15 +727,22 @@ window.collapseAllModules = function() {
     });
 }
 
-// 查看成員詳情
-function viewMemberDetail(memberName) {
-    const data = localStorage.getItem(`combat_data_${memberName}`);
-    if (!data) {
-        alert('找不到該成員數據');
-        return;
-    }
-    
-    const member = JSON.parse(data);
+// 查看成員詳情 - 從 Supabase 讀取
+async function viewMemberDetail(memberName) {
+    try {
+        const { data: memberData, error } = await adminSupabase
+            .from('combat_data')
+            .select('*')
+            .eq('member_name', memberName)
+            .single();
+        
+        if (error || !memberData) {
+            console.error('查詢錯誤:', error);
+            alert('找不到該成員數據');
+            return;
+        }
+        
+        const member = memberData;
     
     // 創建詳情彈窗
     const modal = document.createElement('div');
@@ -867,6 +887,10 @@ function viewMemberDetail(memberName) {
     `;
     
     document.body.appendChild(modal);
+    } catch (err) {
+        console.error('查看詳情錯誤:', err);
+        alert('載入詳情失敗: ' + err.message);
+    }
 }
 
 // 生成裝備詳情 HTML
