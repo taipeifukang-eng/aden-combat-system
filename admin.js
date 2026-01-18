@@ -400,6 +400,12 @@ function generateDimensionComparison(members) {
         }
     }));
     
+    // 將數據保存到全局變量供 onclick 使用
+    window.currentComparisonData = membersPower.map(mp => ({
+        name: mp.name,
+        stats: mp.stats
+    }));
+    
     const dimensions = [
         { key: 'survival', name: '生存力', icon: '🛡️', color: 'red', weights: ADMIN_SURVIVAL_WEIGHTS },
         { key: 'burst', name: '爆發力', icon: '⚔️', color: 'orange', weights: ADMIN_BURST_WEIGHTS },
@@ -444,7 +450,7 @@ function generateDimensionComparison(members) {
                             `;
                         }).join('')}
                     </div>
-                    <button onclick="window.showDimensionDetails('${dim.key}', ${JSON.stringify(membersPower.map(mp => ({name: mp.name, stats: mp.stats})))})" 
+                    <button onclick="window.showDimensionDetails('${dim.key}')" 
                             class="mt-4 w-full bg-${dim.color}-500 hover:bg-${dim.color}-600 text-white py-2 rounded-lg text-sm font-semibold">
                         查看詳細屬性比較
                     </button>
@@ -1065,7 +1071,10 @@ window.toggleDimension = function(dimensionKey) {
 };
 
 // 顯示維度詳細比較
-window.showDimensionDetails = function(dimensionKey, membersData) {
+window.showDimensionDetails = function(dimensionKey) {
+    const membersData = window.currentComparisonData;
+    if (!membersData) return;
+    
     const dimensionInfo = {
         survival: { name: '生存力', weights: ADMIN_SURVIVAL_WEIGHTS, color: 'red' },
         burst: { name: '爆發力', weights: ADMIN_BURST_WEIGHTS, color: 'orange' },
@@ -1109,7 +1118,7 @@ window.showDimensionDetails = function(dimensionKey, membersData) {
         
         html += `
             <tr class="${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 cursor-pointer"
-                onclick="window.showAttributeSource('${attr}', ${JSON.stringify(membersData.map(m => ({name: m.name, stat: m.stats[attr]})))})">
+                onclick="window.showAttributeSource('${attr}')">>
                 <td class="py-3 px-4 font-medium">${attr}</td>
                 ${values.map(v => {
                     const isMax = v === maxValue && maxValue > 0;
@@ -1138,7 +1147,15 @@ window.showDimensionDetails = function(dimensionKey, membersData) {
 };
 
 // 顯示屬性來源詳情
-window.showAttributeSource = function(attrName, membersStatData) {
+window.showAttributeSource = function(attrName) {
+    const membersData = window.currentComparisonData;
+    if (!membersData) return;
+    
+    const membersStatData = membersData.map(m => ({
+        name: m.name,
+        stat: m.stats[attrName]
+    }));
+    
     let html = `
         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="this.remove()">
             <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden" onclick="event.stopPropagation()">
