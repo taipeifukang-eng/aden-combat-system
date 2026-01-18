@@ -91,10 +91,21 @@ function calculateAdminMemberStats(member) {
     ];
     
     allStats.forEach(stat => {
-        stats[stat] = { total: 0 };
+        stats[stat] = { total: 0, sources: [] };
     });
     
     const moduleKeys = ['star', 'pattern', 'item', 'artifact', 'doll', 'transform', 'prof', 'elixir'];
+    const moduleNames = {
+        'star': '守護星',
+        'pattern': '紋樣',
+        'item': '道具收集',
+        'artifact': '神器',
+        'doll': '洋娃娃',
+        'transform': '變身卡',
+        'prof': '煉金術',
+        'elixir': '煉金靈藥'
+    };
+    
     const equipmentKeys = [
         'eq_helmet', 'eq_tshirt', 'eq_badge', 'eq_shoulder', 'eq_weapon', 'eq_cloak',
         'eq_armor', 'eq_armguard', 'eq_boots', 'eq_gloves', 'eq_pants', 'eq_earring1',
@@ -103,6 +114,37 @@ function calculateAdminMemberStats(member) {
         'eq_guard_seal', 'eq_recover_seal', 'eq_crystal', 'eq_catalyst'
     ];
     
+    const equipmentNames = {
+        'eq_helmet': '頭盔',
+        'eq_tshirt': '襯衫',
+        'eq_badge': '徽章',
+        'eq_shoulder': '肩甲',
+        'eq_weapon': '武器',
+        'eq_cloak': '斗篷',
+        'eq_armor': '盔甲',
+        'eq_armguard': '臂甲',
+        'eq_boots': '靴子',
+        'eq_gloves': '手套',
+        'eq_pants': '褲子',
+        'eq_earring1': '耳環1',
+        'eq_earring2': '耳環2',
+        'eq_belt': '腰帶',
+        'eq_necklace': '項鍊',
+        'eq_ring1': '戒指1',
+        'eq_ring2': '戒指2',
+        'eq_ring3': '戒指3',
+        'eq_ring4': '戒指4',
+        'eq_bracelet1': '手鐲1',
+        'eq_bracelet2': '手鐲2',
+        'eq_bracelet3': '手鐲3',
+        'eq_rune1': '符文1',
+        'eq_rune2': '符文2',
+        'eq_guard_seal': '守護刻印',
+        'eq_recover_seal': '恢復刻印',
+        'eq_crystal': '結晶',
+        'eq_catalyst': '觸媒'
+    };
+    
     // 遍歷所有模組
     moduleKeys.forEach(moduleKey => {
         if (member[moduleKey]) {
@@ -110,6 +152,10 @@ function calculateAdminMemberStats(member) {
                 const numValue = parseFloat(value) || 0;
                 if (numValue > 0 && stats[field]) {
                     stats[field].total += numValue;
+                    stats[field].sources.push({
+                        source: moduleNames[moduleKey],
+                        value: numValue
+                    });
                 }
             });
         }
@@ -123,7 +169,12 @@ function calculateAdminMemberStats(member) {
                     if (field === '裝備名稱') return;
                     const numValue = parseFloat(value) || 0;
                     if (numValue > 0 && stats[field]) {
+                        const equipmentName = member.equipment[eqKey]['裝備名稱'];
                         stats[field].total += numValue;
+                        stats[field].sources.push({
+                            source: equipmentName ? `${equipmentNames[eqKey]}(${equipmentName})` : equipmentNames[eqKey],
+                            value: numValue
+                        });
                     }
                 });
             }
