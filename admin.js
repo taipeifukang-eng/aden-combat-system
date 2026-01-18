@@ -383,6 +383,91 @@ function bindComparisonEvents() {
     }
 }
 
+// 生成四大維度比較
+function generateDimensionComparison(members) {
+    // 計算每個成員的屬性統計
+    const membersStats = members.map(m => calculateAdminMemberStats(m));
+    
+    // 計算每個成員的四大維度戰力
+    const membersPower = members.map((m, idx) => ({
+        name: m.member_name,
+        stats: membersStats[idx],
+        power: {
+            survival: calculateDimensionPower(membersStats[idx], ADMIN_SURVIVAL_WEIGHTS),
+            burst: calculateDimensionPower(membersStats[idx], ADMIN_BURST_WEIGHTS),
+            penetration: calculateDimensionPower(membersStats[idx], ADMIN_PENETRATION_WEIGHTS),
+            pvp: calculateDimensionPower(membersStats[idx], ADMIN_PVP_WEIGHTS)
+        }
+    }));
+    
+    const dimensions = [
+        { key: 'survival', name: '生存力', icon: '🛡️', color: 'red', weights: ADMIN_SURVIVAL_WEIGHTS },
+        { key: 'burst', name: '爆發力', icon: '⚔️', color: 'orange', weights: ADMIN_BURST_WEIGHTS },
+        { key: 'penetration', name: '穿透力', icon: '🎯', color: 'blue', weights: ADMIN_PENETRATION_WEIGHTS },
+        { key: 'pvp', name: 'PVP優勢', icon: '👑', color: 'purple', weights: ADMIN_PVP_WEIGHTS }
+    ];
+    
+    let html = '<div class="grid grid-cols-2 gap-4">';
+    
+    dimensions.forEach(dim => {
+        const values = membersPower.map(mp => mp.power[dim.key]);
+        const maxValue = Math.max(...values);
+        
+        html += `
+            <div class="bg-white rounded-lg border border-${dim.color}-200 overflow-hidden">
+                <div class="bg-${dim.color}-100 px-4 py-2 cursor-pointer hover:bg-${dim.color}-200 transition"
+                     onclick="window.toggleDimension('${dim.key}')">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-2">${dim.icon}</span>
+                            <span class="font-bold text-${dim.color}-700">${dim.name}</span>
+                        </div>
+                        <span class="material-icons text-${dim.color}-600" id="dim-toggle-${dim.key}">expand_more</span>
+                    </div>
+                </div>
+                <div id="dim-content-${dim.key}" class="p-4" style="display: none;">
+                    <div class="space-y-3">
+                        ${membersPower.map((mp, idx) => {
+                            const value = values[idx];
+                            const isMax = value === maxValue;
+                            const percentage = maxValue > 0 ? (value / maxValue * 100) : 0;
+                            return `
+                                <div>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-sm font-semibold ${isMax ? 'text-' + dim.color + '-700' : 'text-gray-700'}">${mp.name}</span>
+                                        <span class="text-sm font-bold ${isMax ? 'text-' + dim.color + '-700' : 'text-gray-600'}">${value.toLocaleString()}</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="bg-${dim.color}-500 h-2 rounded-full ${isMax ? 'bg-' + dim.color + '-600' : ''}" style="width: ${percentage}%"></div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    <button onclick="window.showDimensionDetails('${dim.key}', ${JSON.stringify(membersPower.map(mp => ({name: mp.name, stats: mp.stats})))})" 
+                            class="mt-4 w-full bg-${dim.color}-500 hover:bg-${dim.color}-600 text-white py-2 rounded-lg text-sm font-semibold">
+                        查看詳細屬性比較
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    return html;
+}
+
+// 計算單一維度戰力
+function calculateDimensionPower(memberStats, weights) {
+    let power = 0;
+    Object.entries(weights).forEach(([stat, weight]) => {
+        if (memberStats[stat]) {
+            power += memberStats[stat].total * weight;
+        }
+    });
+    return Math.floor(power);
+}
+
 // 顯示比較結果
 function showComparison(members) {
     console.log('開始比較，成員數量:', members.length);
@@ -479,6 +564,15 @@ function showComparison(members) {
                         全部折疊
                     </button>
                 </div>
+            </div>
+            
+            <!-- 四大維度戰力比較 -->
+            <div class="mb-8 p-6 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+                <h4 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                    <span class="material-icons text-purple-600 mr-2">assessment</span>
+                    四大維度戰力比較
+                </h4>
+                ${generateDimensionComparison(members)}
             </div>
             
             <div class="space-y-6">
@@ -953,6 +1047,147 @@ function generateEquipmentDetail(equipment) {
     
     return html || '<div class="text-gray-500 text-sm col-span-3">尚無裝備數據</div>';
 }
+
+// 切換維度展開/折疊
+window.toggleDimension = function(dimensionKey) {
+    const content = document.getElementById(`dim-content-${dimensionKey}`);
+    const toggle = document.getElementById(`dim-toggle-${dimensionKey}`);
+    
+    if (content && toggle) {
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            toggle.textContent = 'expand_less';
+        } else {
+            content.style.display = 'none';
+            toggle.textContent = 'expand_more';
+        }
+    }
+};
+
+// 顯示維度詳細比較
+window.showDimensionDetails = function(dimensionKey, membersData) {
+    const dimensionInfo = {
+        survival: { name: '生存力', weights: ADMIN_SURVIVAL_WEIGHTS, color: 'red' },
+        burst: { name: '爆發力', weights: ADMIN_BURST_WEIGHTS, color: 'orange' },
+        penetration: { name: '穿透力', weights: ADMIN_PENETRATION_WEIGHTS, color: 'blue' },
+        pvp: { name: 'PVP優勢', weights: ADMIN_PVP_WEIGHTS, color: 'purple' }
+    };
+    
+    const dim = dimensionInfo[dimensionKey];
+    if (!dim) return;
+    
+    // 獲取該維度的所有屬性
+    const attrs = Object.keys(dim.weights);
+    
+    let html = `
+        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="this.remove()">
+            <div class="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden" onclick="event.stopPropagation()">
+                <div class="bg-${dim.color}-600 text-white px-6 py-4 flex justify-between items-center">
+                    <h3 class="text-2xl font-bold">${dim.name} - 詳細屬性比較</h3>
+                    <button onclick="this.closest('.fixed').remove()" class="text-white hover:text-gray-200">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
+                <div class="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-100 sticky top-0">
+                                <tr>
+                                    <th class="text-left py-3 px-4 font-bold">屬性</th>
+                                    ${membersData.map(m => `<th class="text-center py-3 px-4 font-bold">${m.name}</th>`).join('')}
+                                    <th class="text-center py-3 px-4 font-bold bg-yellow-100">差異</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+    `;
+    
+    attrs.forEach((attr, idx) => {
+        const values = membersData.map(m => m.stats[attr] ? m.stats[attr].total : 0);
+        const maxValue = Math.max(...values);
+        const minValue = Math.min(...values);
+        const diff = maxValue - minValue;
+        
+        html += `
+            <tr class="${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 cursor-pointer"
+                onclick="window.showAttributeSource('${attr}', ${JSON.stringify(membersData.map(m => ({name: m.name, stat: m.stats[attr]})))})">
+                <td class="py-3 px-4 font-medium">${attr}</td>
+                ${values.map(v => {
+                    const isMax = v === maxValue && maxValue > 0;
+                    const isMin = v === minValue && minValue > 0 && minValue < maxValue;
+                    return `<td class="text-center py-3 px-4 ${isMax ? 'bg-green-100 font-bold text-green-700' : isMin ? 'bg-red-50 text-red-600' : ''}">${v}</td>`;
+                }).join('')}
+                <td class="text-center py-3 px-4 font-bold ${diff > 0 ? 'text-orange-600 bg-yellow-50' : 'text-gray-400'}">${diff > 0 ? diff : '-'}</td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+                        <span class="material-icons text-sm align-middle">info</span>
+                        點擊任一屬性行可查看該屬性在各模組的來源
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', html);
+};
+
+// 顯示屬性來源詳情
+window.showAttributeSource = function(attrName, membersStatData) {
+    let html = `
+        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="this.remove()">
+            <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden" onclick="event.stopPropagation()">
+                <div class="bg-purple-600 text-white px-6 py-4 flex justify-between items-center">
+                    <h3 class="text-xl font-bold">${attrName} - 來源詳情</h3>
+                    <button onclick="this.closest('.fixed').remove()" class="text-white hover:text-gray-200">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
+                <div class="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+                    <div class="grid grid-cols-${membersStatData.length} gap-4">
+    `;
+    
+    membersStatData.forEach(memberData => {
+        const stat = memberData.stat;
+        const total = stat ? stat.total : 0;
+        const sources = stat ? stat.sources : [];
+        
+        html += `
+            <div class="border rounded-lg overflow-hidden">
+                <div class="bg-purple-100 px-4 py-2 font-bold text-purple-800">
+                    ${memberData.name}
+                    <div class="text-2xl font-bold text-purple-600 mt-1">${total}</div>
+                </div>
+                <div class="p-4">
+                    ${sources.length > 0 ? `
+                        <div class="space-y-2">
+                            ${sources.map(s => `
+                                <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                                    <span class="text-sm text-gray-700">${s.source}</span>
+                                    <span class="font-bold text-gray-900">+${s.value}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : '<div class="text-gray-400 text-sm text-center py-4">無此屬性</div>'}
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', html);
+};
 
 // 綁定載入按鈕事件
 document.addEventListener('DOMContentLoaded', function() {
