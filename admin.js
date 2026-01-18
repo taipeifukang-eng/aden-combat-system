@@ -1171,8 +1171,8 @@ window.showAttributeSource = function(attrName) {
     
     membersStatData.forEach(memberData => {
         const stat = memberData.stat;
-        const total = stat ? stat.total : 0;
-        const sources = stat ? stat.sources : [];
+        const total = stat && stat.total ? stat.total : 0;
+        const sources = stat && stat.sources && Array.isArray(stat.sources) ? stat.sources : [];
         
         html += `
             <div class="border rounded-lg overflow-hidden">
@@ -1183,7 +1183,7 @@ window.showAttributeSource = function(attrName) {
                 <div class="p-4">
                     ${sources.length > 0 ? `
                         <div class="space-y-2">
-                            ${sources.map(s => `
+                            ${sources.filter(s => s && s.source && s.value !== undefined).map(s => `
                                 <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
                                     <span class="text-sm text-gray-700">${s.source}</span>
                                     <span class="font-bold text-gray-900">+${s.value}</span>
